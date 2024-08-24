@@ -9,7 +9,6 @@
 ## Criando um change data capture utilizando um cluster AWS RDS Aurora PostgreSQL
 
 ### Criando e configurando o cluster AWS RDS PostgreSQL
-### Criando um cluster do AWS DRS Aurora Postgresql
 ### Configurando o IAM
 
 ### Instalando a extensão aws_lambda
