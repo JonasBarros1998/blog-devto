@@ -1,0 +1,16 @@
+{
+  "name": "aws-lambda",
+  "version": "1.0.0",
+  "description": "change data capture lambda",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "aws"
+  ],
+  "author": "Jonas Barros",
+  "license": "ISC",
+  "dependencies": {}
+}
