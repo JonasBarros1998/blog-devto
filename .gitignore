@@ -1,0 +1,4 @@
+change-data-capture-com-aws-rds-postgresql/infra/.terraform
+change-data-capture-com-aws-rds-postgresql/infra/.terraform.lock.hcl
+change-data-capture-com-aws-rds-postgresql/infra/terraform.tfstate.backup
+
