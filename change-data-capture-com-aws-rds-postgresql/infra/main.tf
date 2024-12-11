@@ -77,7 +77,7 @@ module "aurora_postgresql_v2" {
   db_subnet_group_name = "default-vpc-06fedef18b06f924a"
   security_group_name = "default"
   publicly_accessible  = true
-  master_username = "cdcjonasbarros"
+  master_username = "cdcStoreDevTo"
   apply_immediately = true
   iam_roles = {
     lambda = {
