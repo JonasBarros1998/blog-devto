@@ -3,8 +3,10 @@
 ## Introdução
 
 #### Visão geral
-Change Data Capture ou CDC é um método utilizado para extrair dados de uma base primária para uma outra base de destino utilizando algum conector viabilizar esta comunicação \
-[ADD_IMAGE] \
+Change Data Capture ou CDC é um método utilizado para extrair dados de uma base primária para uma outra base de destino utilizando algum conector viabilizar esta comunicação
+
+![image](https://github.com/user-attachments/assets/036e19c7-a1aa-47fe-85b9-b81b64b8a4cc)
+
 Este conector será ativado quando ocorrer um evento no qual irá alterar o estado da sua base de dados primária.
 
 Após a ocorrência deste evento, o conector será ativado recebendo os dados que foram alterados, com estes dados em mãos nós podemos enviá-los para outro ambiente, como por exemplo uma outra base de dados no qual sua funcionalidade principal é ser um data lake.
