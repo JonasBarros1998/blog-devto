@@ -1,8 +1,6 @@
-# Change data capture com AWS RDS e PostgreSQL
-
 ## Introdução
 
-#### Visão geral
+### Visão geral
 Change Data Capture ou CDC é um método utilizado para extrair dados de uma base primária para uma outra base de destino utilizando algum conector viabilizar esta comunicação
 
 ![image](https://github.com/user-attachments/assets/036e19c7-a1aa-47fe-85b9-b81b64b8a4cc)
@@ -42,8 +40,7 @@ Repositório: [Change data capture com AWS RDS Aurora PostgreSQL](https://github
 Utilizando o módulo [aurora_postgresql_v2](https://registry.terraform.io/modules/terraform-aws-modules/rds-aurora/aws/latest) nós podemos começar a criação de um [cluster e uma instância do aurora PostgreSQL](https://github.com/JonasBarros1998/blog-devto/blob/main/change-data-capture-com-aws-rds-postgresql/infra/main.tf#L57). 
 Para que não haja custos elevados, sua configuração foi a mais básica possível, evitando adicionar outros recursos como escalabilidade e segurança no cluster RDS. 
 
-Como nós criamos o cluster dentro de uma VPC, precisaríamos adicionar novos recursos para permitir a conexão entre máquina local e instância RDS. Um exemplo muito comum é 
-criar uma instância EC2 que irá fazer a ponte e permitir a conexão entre máquina local e instância RDS. Porém fazer esse processo também envolve custos, 
+Como nós criamos o cluster dentro de uma VPC, precisaríamos adicionar novos recursos para permitir a conexão entre máquina local e instância RDS. Um exemplo muito comum é criar uma instância EC2 que irá fazer a ponte e permitir a conexão entre máquina local e instância RDS. Porém fazer esse processo também envolve custos,
 portanto para que não tenhamos custos elevados enquanto estamos estudando o CDC, nós criamos a instância de forma [pública](https://github.com/JonasBarros1998/blog-devto/blob/main/change-data-capture-com-aws-rds-postgresql/infra/main.tf#L79)
 
 ```tf
@@ -56,11 +53,10 @@ publicly_accessible    = true # acesso público
 
 Para realizar a conexão entre máquina local e cluster, podemos utilizar a porta 5432. 
 
-Para que a conexão entre lambda e cluster ocorra com sucesso, precisamos adicionar regras de entrada e saída. Dentro desta regra adicionamos um range com 
-IP padrão apenas para fins de demonstração, mas em um ambiente produtivo configure corretamente o range de IP no qual o cluster aceitará receber conexões. 
+Para que a conexão entre lambda e cluster ocorra com sucesso, precisamos adicionar regras de entrada e saída. Dentro desta regra adicionamos um range com IP padrão apenas para fins de demonstração, mas em um ambiente produtivo configure corretamente o range de IP no qual o cluster aceitará receber conexões. 
+
 A senha que precisamos para se conectar ao banco, é gerada automaticamente e adicionada no **secret manager**. Portanto, 
 para fazer a conexão com o cluster, acesse o secret manager no console AWS e copie a senha armazenada. 
-
 
 ``` tf
 security_group_rules = {
@@ -97,7 +93,6 @@ security_group_rules = {
   }
 
 ```
-
 
 ### Configurando o IAM
 
@@ -142,7 +137,7 @@ data "aws_iam_policy_document" "change-data-capture-ducument-policy-cluster-rds"
     ]
 
     resources = [
-      "arn:aws:lambda:us-east-1:700552527916:function:${var.lambda_name}"
+      "arn:aws:lambda:us-east-1:AWS_ACOUNT_ID:function:${var.lambda_name}"
     ]
   }
 }
@@ -164,6 +159,7 @@ iam_roles = {
 ```
 
 ### Criando a função lambda
+
 Agora que terminamos a configuração do módulo postgresql e toda a estrutura de comunicação com outros serviços, precisamos criar e configurar a nossa lambda. 
 
 Precisei criar uma nova ***role do tipo Principal*** para geração de credenciais temporárias. Esse é o processo padrão para criação de qualquer lambda
@@ -186,7 +182,8 @@ resource "aws_iam_role" "change-data-capture-role-lambda" {
 }
 
 ```
-Em seguida, precisamos criar as políticas de acesso e a criação do recurso do ***cloud watch***. Sem eles a lambda não enviará os resultados dos logs que deixaremos no código para observar o resultado que a função gerará ao ser chamada pelo banco. 
+Em seguida, precisamos criar as políticas de acesso e a criação do recurso do ***cloudWatch***. 
+Sem eles a lambda não conseguiremos observar o resultado da integração entre banco e lambda.
 
 ```
 resource "aws_iam_policy" "change-data-capture-lambda-policy" {
@@ -210,7 +207,6 @@ resource "aws_cloudwatch_log_group" "change-data-capture-cloudwatch" {
 
 Em seguida precisaremos dizer ao terraform qual é o arquivo que será inserido na lambda. Para isso criei um recurso que me diz qual o caminho para o arquivo ZIP, no qual deverá conter todo código fonte que utilizaremos. \
 [Segue o repositório contendo o código fonte desenvolvido em Javascript](https://github.com/JonasBarros1998/blog-devto/tree/main/change-data-capture-com-aws-rds-postgresql/src). Desenvolvemos algo bem simples, apenas enviamos ao CloudWatch o que a lambda está recebendo ao ser chamada pelo banco de dados. 
-
 
 ```
 data "archive_file" "change-data-capture-archive-file" {
@@ -236,40 +232,31 @@ resource "aws_lambda_function" "change-data-capture-function" {
 
 ## Conectando o AWS RDS com a função lambda 
 
-Antes de fazer os passos abaixo, certifique que os recursos foram criados corretamente quando rodou o comando terraform apply. Na AWS, acesse o secret manager e identifique a senha que foi criada quando o terraform foi executado. Copie e deixe-a separada já que iremos utilizá-la para se conectar com o banco. \
+Antes de fazer os passos abaixo, certifique que os recursos foram criados corretamente quando rodou o comando terraform apply. Na AWS, acesse o secret manager e identifique a senha que foi criada quando o terraform foi executado. Copie e deixe-a separada já que iremos utilizá-la para se conectar com o banco.
 A senha mudará a cada momento em que você fazer o destroy da infra e recriá-la novamente. 
-
 
 ### Conectando com o banco de dados
 
-Na AWS acesse o RDS e identifique o cluster que foi criado. Ao selecionar o cluster, pegue a string de conexão, pois ela será necessária para fazermos a conexão entre a máquina local com o nosso banco de dados. A string de conexão deverá ter o seguinte formato: \
+Na AWS acesse o RDS e identifique o cluster que foi criado. Ao selecionar o cluster, pegue a string de conexão, pois ela será necessária para fazermos a conexão entre a máquina local com o nosso banco de dados. A string de conexão deverá ter o seguinte formato:
 
 `{nome-do-cluster}.{numero-identificador}.{regiao}.rds.amazonaws.com`
 
-
-**Para fazer a conexão com o banco, utilize o comando abaixo:**
+Para fazer a conexão com o banco, utilize o seguinte comando:
 
 `psql -h {nome-do-cluster}.{identificador-unico}.{regiao}.rds.amazonaws.com -U cdcStoreDevTo -p 5432 -d cdcstore`
 
 
-`-h = host de conexão`\
-`-U = nome do usuário`\
-`-p = porta de conexão com o banco` \
+`-h = host de conexão`
+`-U = nome do usuário`
+`-p = porta de conexão com o banco`
 `-d = nome da database`
 
-Ao fazer o comando acima, vai aparecer no terminal um prompt para digitar a senha, portanto utilize a senha que foi criada e armazenada dentro do secret manager
+Ao fazer o comando acima, vai aparecer no terminal um prompt para digitar a senha, portanto utilize a senha que foi criada e armazenada dentro do secret manager.
 Se a conexão for realizada com sucesso, você estará neste momento dentro da instância cdcstore
 
 ### Instalando a extensão aws_lambda
 
-Instalando a extensão aws_lambda
-Após conectar na instância, instale a extensão aws_lambda. Mas para que seja possível fazer a chamada ao lambda, precisamos também instalar a extensão aws_commons. 
-Ao inserir o comando abaixo, será instalada ambas as extensões citadas anteriormente.\
-Se a conexão for realizada com sucesso, você estará neste momento dentro da instância cdcstore 
-
-### Instalando a extensão aws_lambda
-
-Após realizar a conexão com a instância, instale a extensão `aws_lambda`. Mas para que seja possível fazer a chamada, precisamos também instalar a extensão aws_commons. 
+Após realizar a conexão com a instância, instale a extensão `aws_lambda`. Mas para que seja possível fazer a chamada, precisamos também instalar a extensão `aws_commons`. 
 Ao inserir o comando abaixo, será instalada ambas as extensões que precisaremos para enviamos dados ao aws lambda. 
 
 ```sql
@@ -278,9 +265,8 @@ CREATE EXTENSION IF NOT EXISTS aws_lambda CASCADE;
 
 #### Mas o que são extensões no postgreSQL? 
 
-A extensão é uma funcionalidade que você pode criar para fazer alguns trabalhos extras. Uma extensão bastante famosa no postgreSQL é o hstore, com ela nós podemos armazenar um conjunto de chave/valor em um único registro. Veja o exemplo abaixo, nós utilizamos a extensão com um tipo para o campo products, e adicionamos os dados chave/valor. 
+A extensão é uma funcionalidade que você pode criar para fazer alguns trabalhos extras. Uma extensão bastante famosa no postgreSQL é o hstore, com ela nós podemos armazenar um conjunto de chave/valor em um único registro. Veja o exemplo abaixo, nós utilizamos a extensão como um tipo para o campo `products`, e adicionamos os dados chave/valor. 
 
-A extensão é uma funcionalidade que você pode criar para fazer alguns trabalhos extras. Uma extensão bastante famosa no postgreSQL é o hstore, com ela nós podemos armazenar um conjunto de chave/valor em um único registro. Veja o exemplo abaixo, nós utilizamos essa extensão como um tipo para o campo products, e adicionamos os dados chave/valor. 
 
 ```sql
 CREATE EXTENSION hstore;
@@ -295,10 +281,10 @@ SELECT products['c'] from store;
 
 ```
 
-A `aws_lambda` também é uma extensão, como dizemos anteriormente, as extensões vão fazer um trabalho extra, ou aprimorar alguma funcionalidade como vimos com hstore.
-Veja que com o hstore é possível utilizar uma chave para consultar um único item ou um conjunto deles, dependendo dos valores que foram adicionados que foram incluidos.  
+A `aws_lambda` também é uma extensão. Como dizemos anteriormente, as extensões vão fazer um trabalho extra, ou aprimorar alguma funcionalidade como vimos com hstore.
+Veja que com o hstore é possível utilizar uma chave para consultar um único item ou um conjunto deles, dependendo dos valores que foram adicionados. 
 
-Também é possível criar as nossas próprias extensões no postgreSQL. Para isso podemos criar um arquivo com extensão `.sql`, e adicionar todo o conteúdo da extensão dentro dele, e salvaremos esse arquivo dentro do diretório de instalação do postgreSQL na pasta /extension. Para encontrar o diretório de instalação consulte a documentação oficial do banco. Mas para sistemas operacionais baseados em linux, possivelmente irá encontrá-lo no seguinte caminho:`/usr/share/postgresql/{NUMERO_DA_VERSAO_DO_POSTGRESQL}/extension`
+Também é possível criar as nossas próprias extensões no postgreSQL. Para isso podemos criar um arquivo `nome_do_arquivo.sql`, e adicionar todo o conteúdo da extensão dentro dele, e salvaremos esse arquivo dentro do diretório de instalação do postgreSQL na pasta /extension. Para encontrar o diretório de instalação consulte a documentação oficial do banco. Mas para sistemas operacionais baseados em linux, possivelmente irá encontrá-lo no seguinte caminho:`/usr/share/postgresql/{NUMERO_DA_VERSAO_DO_POSTGRESQL}/extension`
 
 Após escrevemos a nossa extensão e inseri-la na pasta /extension, podemos instalar a extensão com o comando a seguir. Após instalada, poderá ser utilizada normalmente conforme você desenvolveu. 
 
@@ -307,9 +293,9 @@ CREATE EXTENSION nome_extensão;
 ```
 Porém como estamos trabalhando com RDS, não será possível acessarmos o diretório de instalação do postgreSQL para criarmos as nossas extensões, logo teremos que utilizar uma nova abordagem chamada [TLE - Trusted Language Extensions](https://docs.aws.amazon.com/pt_br/AmazonRDS/latest/UserGuide/PostgreSQL_trusted_language_extension-terminology.html).
 
-Trusted Language Extension é um kit de desenvolvimento de código aberto utilizado para criar as nossas extensões de maneira segura. Como foi visto anteriormente, para instalar as extensões da maneira padrão, é necessário criar um script dentro da pasta /extension localizado no diretório de instalação do postgreSQL. Porém, por motivos de segurança o RDS não possibilita o acesso ao sistema de arquivos da instância no qual está rodando o banco de dados. E se desejarmos criar a nossa extensão para rodar dentro do RDS será necessário utilizar o kit de desenvolvimento TLE. 
+Trusted Language Extension é um kit de desenvolvimento de código aberto utilizado para criar as nossas extensões de maneira segura. Como foi visto anteriormente, para instalar as extensões da maneira padrão, é necessário criar um script dentro da pasta /extension localizado no diretório de instalação do postgreSQL. Porém, por motivos de segurança o RDS não possibilita o acesso ao sistema de arquivos da máquina no qual está rodando a instância. E se desejarmos criar a nossa extensão para rodar dentro do RDS será necessário utilizar o kit de desenvolvimento TLE. 
 
-Quando instalamos o TLE, temos disponíveis o que são chamadas de linguagens seguras para desenvolver os nossos scripts, como por exemplo o PL/V8 no qual é uma biblioteca que fornece uma linguagem procedural para PostgreSQL que utiliza o V8 JavaScript Engine. Ao utilizá-la nós não conseguiremos acessar ou manipular quaisquer conteúdos dentro do sistema de arquivos da instância que roda o banco de dados. 
+Quando instalamos o TLE, temos disponíveis o que chamamos de linguagens seguras para desenvolver os nossos scripts, como por exemplo o PL/V8 no qual é uma biblioteca que fornece uma linguagem procedural para PostgreSQL que utiliza o V8 JavaScript Engine. Ao utilizá-la nós não conseguiremos acessar ou manipular quaisquer conteúdos dentro do sistema de arquivos da instância que roda o banco de dados. 
 
 Na [documentação do PostgreSQL](https://www.postgresql.org/docs/current/plperl-trusted.html) temos um exemplo no qual seremos barrados ao tentarmos criar um arquivo dentro do diretório /tmp. Este exemplo foi feito utilizando o PL/PERL no qual também é uma versão segura para criarmos as nossas extensões. 
 
@@ -322,9 +308,7 @@ CREATE FUNCTION badfunc() RETURNS integer AS $$
     close $fh or elog(ERROR, qq{could not close the file "$tmpfile": $!});
     return 1;
 $$ LANGUAGE plperl;
-```
-
-Para instalar o pg_tle, podemos utilizar o comando a seguir. 
+``` 
 
 O comando a seguir pressupõe que você já tenha criado um grupo de parâmetros para a sua instância, então você só precisará substituir a variável ADD_PARAMETER_GROUP_NAME pelo nome do grupo de parâmetros.  Ao final deste tópico terá um link para a documentação auxiliando na criação de um grupo de parâmetros para a instância que você está utilizando.
 
@@ -357,8 +341,7 @@ As extensões hstore e aws_lambda já vem pré-carregada dentro da instância au
 
 ## Testando funcionalidade
 
-Vamos fazer um primeiro teste simples. Vamos utilizar a função create_lambda_function_arn e passar o ARN da nossa lambda, 
-em seguida passaremos uma string contendo apenas uma simples mensagem e converteremos esse valor para o tipo json
+Vamos fazer um primeiro teste simples. Vamos utilizar a função `create_lambda_function_arn` e passar o ARN da nossa lambda, em seguida passaremos uma string contendo apenas uma simples mensagem e converteremos esse valor para o tipo json
 
 ```sql
 SELECT * from aws_lambda.invoke(aws_commons.create_lambda_function_arn('ARN FUNCAO LAMBDA', 'us-east-1'), '{"body": "Hello Word"}'::json);
@@ -388,7 +371,6 @@ CREATE TABLE store (
 
 Para se criar um trigger é muito simples então podemos seguir o que está descrito na [documentação oficial](https://www.postgresql.org/docs/current/sql-createtrigger.html)
 
-Para que o trigger funcione corretamente, precisamos criar uma função que será acionada quando o trigger for acionado. 
 
 ```sql
 CREATE TRIGGER integration_lambda_trigger
@@ -396,10 +378,12 @@ CREATE TRIGGER integration_lambda_trigger
   FOR EACH ROW 
   EXECUTE FUNCTION integration_lambda()
 
+-- integration_lambda_trigger: nome do trigger
+-- integration_lambda() nome da function
+
 ```
 
-Para que o trigger funcione corretamente, precisamos criar uma função que será chamada quando o trigger for acionado
-
+Em seguida precisamos criar uma função que será chamada quando o trigger for acionado
 
 ```sql
 CREATE FUNCTION integration_lambda() RETURNS TRIGGER AS $$
@@ -421,17 +405,17 @@ Iniciamos a função com uma declaração de variável chamada json_text, nós u
 o valor de retorno da função chamada [json_build_object()](https://www.postgresql.org/docs/current/functions-json.html). Ela será a responsável por criar um JSON de 
 acordo com os dados que inserimos na tabela `store`. Para isso, teremos que estruturar a função da 
 seguinte maneira. Devemos passar o nome da chave do json e logo em seguida o seu respectivo valor. 
-Para pegarmos este valor podemos utilizar o operador NEW composto pelo nome da coluna da tabela. `NEW.store_id`
+Para pegarmos este valor podemos utilizar o operador `NEW` composto pelo nome da coluna da tabela. `NEW.store_id`
 
 
 O próximo passo será fazer a chamada para a função Lambda com aws_lambda.invoke. Como primeiro parâmetro 
 da função temos que passar o endereço da nossa lambda, ou seja o ARN e a região no qual a lambda foi criada. 
 Já no segundo parâmetro, passamos a variável json_text no qual estará armazenado o JSON que enviaremos ao lambda. 
-Observe também na expressão ::json. Somos obrigados a passar esse valor porque temos que fazer um cast para deixar explícito o tipo de dado que estamos enviando.
+Observe também a expressão ::json. Somos obrigados a passar esse valor porque temos que fazer um cast para deixar explícito o tipo de dado que estamos enviando.
 
 Por fim, retornamos novamente o operador NEW no final da função. 
 
-Se observer no repositório, teremos um script SQL no qual temos todos esses passos sendo executados. Portanto vamos utilizá-lo enviando o comando no momento de fazer a conexão
+Se observar no repositório, teremos um script SQL no qual temos todos esses passos sendo executados. Portanto vamos utilizá-lo enviando o comando no momento de fazer a conexão
 com o banco de dados. 
 
 Mas também podemos utilizar o PgAdmim para executar todas as funcionalides incluidas no script. 
@@ -456,7 +440,7 @@ como esses
 Mas não se preocupe, esses erros só ocorrerão quando você executar pela primeira vez, já que a todo o momento que executamos o script, adicionei 
 algumas funcionalidades para remover todos os recursos criados anteriormente e recriá-los novamente. 
 
-A seguir podemos executar alguns inserts para todos os recursos funcionando. 
+A seguir podemos executar alguns inserts para visualizar todos os recursos em funcionamento. 
 
 ```sql
 INSERT INTO store (store_id, name_store, address, segments) VALUES (1, 'my store', '76 street', 'tecnology');
